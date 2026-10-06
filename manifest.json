@@ -1,0 +1,15 @@
+{
+  "name": "Quadro de Investigação",
+  "version": "1.0.0",
+  "manifest_version": 1,
+  "description": "Quadro de investigação em tela cheia: documentos com alfinete, linhas de tricô, lupa e leitor.",
+  "author": "Seu Nome",
+  "icon": "https://emixiszao.github.io/quadro-owlbear/icon.svg",
+  "action": {
+    "title": "Quadro de Investigação",
+    "icon": "https://emixiszao.github.io/quadro-owlbear/icon.svg",
+    "popover": "https://emixiszao.github.io/quadro-owlbear/index.html",
+    "width": 380,
+    "height": 560
+  }
+}

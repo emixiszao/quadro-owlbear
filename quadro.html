@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quadro de Investigação</title>
+<style>
+  html, body { margin:0; height:100%; overflow:hidden; font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:none; }
+  /* cortiça gerada por código (pode ser trocada por uma imagem depois) */
+  body {
+    background:
+      radial-gradient(ellipse at center, rgba(0,0,0,0) 50%, rgba(0,0,0,.5) 100%),
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><filter id='a' x='0' y='0' width='1' height='1'><feTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='3' seed='7' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .30  0 0 0 0 .17  0 0 0 0 .07  0 0 0 2.6 -.95'/></filter><filter id='b' x='0' y='0' width='1' height='1'><feTurbulence type='fractalNoise' baseFrequency='.02' numOctaves='3' seed='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .22  0 0 0 0 .13  0 0 0 0 .05  0 0 0 1.4 -.45'/></filter><filter id='c' x='0' y='0' width='1' height='1'><feTurbulence type='fractalNoise' baseFrequency='1.6' numOctaves='2' seed='11' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .95  0 0 0 0 .82  0 0 0 0 .6  0 0 0 2.4 -1.35'/></filter><rect width='100%' height='100%' fill='%23b88a5b'/><rect width='100%' height='100%' filter='url(%23b)'/><rect width='100%' height='100%' filter='url(%23a)'/><rect width='100%' height='100%' filter='url(%23c)'/></svg>"),
+      #b88a5b;
+  }
+  #moldura { position:fixed; inset:0; pointer-events:none; z-index:50; box-shadow:inset 0 0 0 16px #5b3a22, inset 0 0 0 18px #3a2414, inset 0 0 70px 20px rgba(0,0,0,.55); }
+  #stage { position:absolute; left:50%; top:50%; width:1600px; height:900px; transform-origin:center center; }
+  #docs, #pins, #cords { position:absolute; left:0; top:0; width:1600px; height:900px; }
+  #docs { z-index:1; } #cords { z-index:2; overflow:visible; pointer-events:none; } #pins { z-index:3; pointer-events:none; }
+
+  .doc { position:absolute; left:0; top:0; cursor:grab; touch-action:none; background:#fff; filter:drop-shadow(0 3px 4px rgba(0,0,0,.45)); will-change:transform; }
+  .doc img { display:block; width:100%; height:100%; pointer-events:none; }
+  .doc.lev { filter:drop-shadow(0 16px 14px rgba(0,0,0,.5)); cursor:grabbing; }
+  .doc.sel { outline:4px solid #ffd54a; outline-offset:3px; }
+  .doc.quebrado { display:flex; align-items:center; justify-content:center; background:#ddd; color:#555; font-size:13px; text-align:center; }
+  .pin { position:absolute; left:0; top:0; width:24px; height:24px; will-change:transform; transition:opacity .1s; }
+  .pin.off { opacity:0; }
+  .pin svg { display:block; }
+  .pin.pop svg { animation:pinpop .28s cubic-bezier(.2,1.4,.4,1); }
+  @keyframes pinpop { from { transform:scale(2) translateY(-6px); opacity:.2; } to { transform:none; opacity:1; } }
+
+  .fio-hit { stroke:transparent; stroke-width:16; fill:none; pointer-events:none; }
+  body.t-ligar .fio-hit { pointer-events:stroke; cursor:pointer; }
+  body.t-ligar .doc { cursor:crosshair; } body.t-lupa .doc { cursor:zoom-in; }
+  body.t-ligar .fio-hit:hover + .fio-sel { opacity:1; }
+
+  #barra { position:fixed; left:50%; bottom:30px; transform:translateX(-50%); z-index:60; display:flex; gap:6px; padding:8px; background:rgba(25,22,20,.88); border-radius:14px; box-shadow:0 6px 24px #0009; }
+  #barra button { border:0; border-radius:9px; padding:9px 14px; background:#3a3430; color:#eee; font-size:14px; cursor:pointer; }
+  #barra button:hover { background:#4b433d; } #barra button.on { background:#f3e7cf; color:#222; }
+  #dica { position:fixed; left:50%; bottom:92px; transform:translateX(-50%); z-index:60; padding:6px 12px; border-radius:20px; background:rgba(0,0,0,.65); color:#eee; font-size:13px; pointer-events:none; text-align:center; max-width:80vw; }
+  #fechar { position:fixed; top:26px; right:28px; z-index:60; width:38px; height:38px; border:0; border-radius:50%; background:rgba(25,22,20,.88); color:#fff; font-size:18px; cursor:pointer; }
+  #fechar:hover { background:#a64848; }
+
+  #lente { position:fixed; display:none; width:230px; height:230px; box-sizing:border-box; border:3px solid #fff; border-radius:50%; background:#000 no-repeat; box-shadow:0 8px 30px #000b; pointer-events:none; z-index:90; }
+  #leitor { position:fixed; inset:0; z-index:80; display:none; align-items:center; justify-content:center; background:rgba(8,6,5,.92); }
+  #leitor img { max-width:90vw; max-height:86vh; box-shadow:0 10px 50px #000; cursor:crosshair; }
+  #leitor .x { position:absolute; top:26px; right:28px; width:38px; height:38px; border:0; border-radius:50%; background:#ffffff22; color:#fff; font-size:18px; cursor:pointer; }
+  #leitor small { position:absolute; bottom:22px; left:0; right:0; text-align:center; color:#aaa; font-size:13px; }
+  #toast { position:fixed; left:50%; top:30px; transform:translateX(-50%); z-index:95; background:#000d; color:#fff; padding:8px 14px; border-radius:20px; font-size:13px; opacity:0; pointer-events:none; transition:opacity .25s; }
+  #toast.v { opacity:1; }
+</style>
+</head>
+<body class="t-mover">
+<div id="stage">
+  <div id="docs"></div>
+  <svg id="cords" viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg"></svg>
+  <div id="pins"></div>
+</div>
+<div id="moldura"></div>
+
+<div id="dica"></div>
+<div id="barra">
+  <button data-f="mover" class="on">✋ Mover</button>
+  <button data-f="ligar">🧶 Ligar</button>
+  <button data-f="lupa">🔍 Lupa</button>
+</div>
+<button id="fechar" title="Fechar o quadro">✕</button>
+
+<div id="leitor"><button class="x">✕</button><img alt=""><small>Passe o mouse para usar a lupa · roda do mouse muda o zoom · clique fora ou Esc para fechar</small></div>
+<div id="lente"></div>
+<div id="toast"></div>
+
+<script type="module">
+import OBR from "https://esm.sh/@owlbear-rodeo/sdk@3";
+import { PD, PC, CH_MOV, MODAL_ID, STAGE_W, STAGE_H, PIN_OFF, lerQuadro, idLivre, tamanho, arred, pinSVG } from "./lib.js";
+
+const $ = s => document.querySelector(s);
+const stage = $("#stage"), docsEl = $("#docs"), pinsEl = $("#pins"), svg = $("#cords");
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const SVGNS = "http://www.w3.org/2000/svg";
+
+const docs = new Map();      // id -> objeto do documento
+const fios = new Map();      // id -> elementos svg
+let cordsDados = [];
+let meta = {};
+let ferramenta = "mover";
+let escala = 1, maxZ = 1, selLigar = null, zoomLupa = 3;
+
+let toastT;
+function toast(m) { const t = $("#toast"); t.textContent = m; t.classList.add("v"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("v"), 2400); }
+
+/* ---------- tela ---------- */
+function ajustar() {
+  escala = Math.min(innerWidth / STAGE_W, innerHeight / STAGE_H);
+  stage.style.transform = `translate(-50%,-50%) scale(${escala})`;
+}
+addEventListener("resize", ajustar); ajustar();
+function paraStage(e) {
+  const r = stage.getBoundingClientRect();
+  return { x: (e.clientX - r.left) / escala, y: (e.clientY - r.top) / escala };
+}
+
+/* ---------- ferramentas ---------- */
+const DICAS = {
+  mover: "Arraste os documentos · roda do mouse gira · duplo clique abre o leitor",
+  ligar: "Clique em dois documentos para ligar com a linha · clique numa linha para cortar",
+  lupa: "Passe o mouse sobre um documento · roda do mouse muda o zoom"
+};
+function setFerramenta(f) {
+  ferramenta = f; selLigar = null;
+  document.body.className = "t-" + f;
+  document.querySelectorAll("#barra button").forEach(b => b.classList.toggle("on", b.dataset.f === f));
+  $("#dica").textContent = DICAS[f]; $("#lente").style.display = "none";
+}
+document.querySelectorAll("#barra button").forEach(b => b.onclick = () => setFerramenta(b.dataset.f));
+setFerramenta("mover");
+$("#fechar").onclick = () => OBR.modal.close(MODAL_ID).catch(() => {});
+addEventListener("keydown", e => {
+  if (e.key === "Escape") { if ($("#leitor").style.display === "flex") fecharLeitor(); else { selLigar = null; } }
+});
+
+/* ---------- documentos ---------- */
+function criarDoc(v) {
+  const el = document.createElement("div"); el.className = "doc"; el.dataset.id = v.id;
+  const img = document.createElement("img"); img.src = v.img; img.draggable = false;
+  img.onerror = () => { el.classList.add("quebrado"); img.remove(); el.textContent = "imagem indisponível"; };
+  el.append(img);
+  const pin = document.createElement("div"); pin.className = "pin"; pin.innerHTML = pinSVG(v.pc);
+  docsEl.append(el); pinsEl.append(pin);
+  const d = { id: v.id, el, pin, data: { ...v }, cur: { x: v.x, y: v.y, r: v.rot }, tgt: { x: v.x, y: v.y, r: v.rot },
+              sw: 0, swv: 0, drag: false, coast: null, remoteUntil: 0, wasLev: false, ultimoEnvio: 0 };
+  dimensionar(d);
+  el.addEventListener("pointerdown", e => aoPressionar(e, d));
+  el.addEventListener("wheel", e => aoRolar(e, d), { passive: false });
+  el.addEventListener("dblclick", () => { if (ferramenta !== "ligar") abrirLeitor(d); });
+  docs.set(v.id, d); return d;
+}
+function dimensionar(d) {
+  const w = d.data.w, h = w * d.data.ar;
+  d.el.style.width = w + "px"; d.el.style.height = h + "px";
+  d.el.style.transformOrigin = `${w / 2}px ${PIN_OFF}px`;
+  d.el.style.zIndex = d.data.z;
+}
+function removerDoc(d) { d.el.remove(); d.pin.remove(); docs.delete(d.id); }
+
+/* ---------- sincronização ---------- */
+function aplicarMeta(m) {
+  meta = m;
+  const { docs: lista, cords } = lerQuadro(m);
+  const vivos = new Set();
+  for (const v of lista) {
+    if (v.del) continue;
+    vivos.add(v.id);
+    let d = docs.get(v.id);
+    if (!d) d = criarDoc(v);
+    else if (d.drag || d.coast) { /* mantém o estado local enquanto está sendo arrastado */ }
+    else {
+      const tamMudou = d.data.w !== v.w || d.data.ar !== v.ar;
+      d.data = { ...v };
+      if (tamMudou) dimensionar(d);
+      d.el.style.zIndex = v.z;
+      d.tgt.x = v.x; d.tgt.y = v.y; d.tgt.r = v.rot;
+    }
+    maxZ = Math.max(maxZ, v.z || 1);
+  }
+  for (const d of [...docs.values()]) if (!vivos.has(d.id)) removerDoc(d);
+  cordsDados = cords.filter(c => !c.del && docs.has(c.a) && docs.has(c.b));
+  montarFios();
+}
+
+function salvarDoc(d) {
+  const v = { ...d.data, x: arred(d.tgt.x), y: arred(d.tgt.y), rot: arred(d.tgt.r), z: d.data.z };
+  d.data = v;
+  OBR.room.setMetadata({ [PD + d.id]: v }).catch(() => {});
+}
+function transmitir(d) {
+  const agora = performance.now();
+  if (agora - d.ultimoEnvio < 40) return;
+  d.ultimoEnvio = agora;
+  OBR.broadcast.sendMessage(CH_MOV, { i: d.id, x: arred(d.tgt.x), y: arred(d.tgt.y), r: arred(d.tgt.r), z: d.data.z }, { destination: "REMOTE" }).catch(() => {});
+}
+function aoReceberMov(ev) {
+  const m = ev.data; if (!m) return;
+  const d = docs.get(m.i); if (!d || d.drag || d.coast) return;
+  d.tgt.x = m.x; d.tgt.y = m.y; d.tgt.r = m.r;
+  if (m.z) { d.data.z = m.z; d.el.style.zIndex = m.z; maxZ = Math.max(maxZ, m.z); }
+  d.remoteUntil = performance.now() + 450;
+}
+
+/* ---------- arrastar, inércia e girar ---------- */
+function aoPressionar(e, d) {
+  if (e.button !== 0) return;
+  if (ferramenta === "ligar") { ligar(d); return; }
+  if (ferramenta === "lupa") return;
+  e.preventDefault();
+  d.el.setPointerCapture(e.pointerId);
+  d.coast = null; d.drag = true;
+  d.data.z = ++maxZ; d.el.style.zIndex = d.data.z;
+  const p0 = paraStage(e);
+  const g = { px: p0.x, py: p0.y, x0: d.tgt.x, y0: d.tgt.y, amostras: [{ t: performance.now(), x: p0.x, y: p0.y }] };
+  const mover = ev => {
+    const q = paraStage(ev), t = performance.now();
+    d.tgt.x = clamp(g.x0 + q.x - g.px, 14, STAGE_W - 14);
+    d.tgt.y = clamp(g.y0 + q.y - g.py, 14, STAGE_H - 14);
+    g.amostras.push({ t, x: q.x, y: q.y });
+    while (g.amostras.length > 2 && t - g.amostras[0].t > 110) g.amostras.shift();
+    transmitir(d);
+  };
+  const soltar = () => {
+    d.el.removeEventListener("pointermove", mover);
+    d.el.removeEventListener("pointerup", soltar);
+    d.el.removeEventListener("pointercancel", soltar);
+    d.drag = false;
+    const a = g.amostras, p = a[0], u = a[a.length - 1], dt = (u.t - p.t) / 1000;
+    let vx = dt > 0.01 ? (u.x - p.x) / dt : 0, vy = dt > 0.01 ? (u.y - p.y) / dt : 0;
+    if (performance.now() - u.t > 90) vx = vy = 0;      // parou antes de soltar
+    const v = Math.hypot(vx, vy);
+    if (v > 2200) { vx *= 2200 / v; vy *= 2200 / v; }
+    if (v > 120) d.coast = { vx: vx * 0.85, vy: vy * 0.85 }; else salvarDoc(d);
+  };
+  d.el.addEventListener("pointermove", mover);
+  d.el.addEventListener("pointerup", soltar);
+  d.el.addEventListener("pointercancel", soltar);
+}
+function aoRolar(e, d) {
+  if (ferramenta === "lupa") return;
+  e.preventDefault();
+  d.tgt.r += (e.deltaY < 0 ? -1 : 1) * 4;
+  transmitir(d);
+  clearTimeout(d.tRot); d.tRot = setTimeout(() => salvarDoc(d), 400);
+}
+
+/* ---------- fios de tricô ---------- */
+function montarFios() {
+  const ids = new Set(cordsDados.map(c => c.id));
+  for (const [id, f] of fios) if (!ids.has(id)) { f.g.remove(); fios.delete(id); }
+  for (const c of cordsDados) {
+    if (fios.has(c.id)) { fios.get(c.id).c = c; continue; }
+    const g = document.createElementNS(SVGNS, "g");
+    const mk = (cls, attrs) => { const p = document.createElementNS(SVGNS, "path"); p.setAttribute("class", cls || ""); for (const k in attrs) p.setAttribute(k, attrs[k]); g.append(p); return p; };
+    const sombra = mk("", { fill: "none", stroke: "rgba(0,0,0,.35)", "stroke-width": 4, "stroke-linecap": "round", transform: "translate(3,5)" });
+    const fio = mk("", { fill: "none", stroke: "#b3201f", "stroke-width": 3, "stroke-linecap": "round" });
+    const trama = mk("", { fill: "none", stroke: "rgba(255,170,150,.55)", "stroke-width": 1.2, "stroke-dasharray": "2 3", "stroke-linecap": "round" });
+    const hit = mk("fio-hit", {});
+    hit.addEventListener("click", () => { if (ferramenta === "ligar") cortar(c.id); });
+    svg.append(g); fios.set(c.id, { g, c, sombra, fio, trama, hit });
+  }
+}
+function atualizarFios() {
+  for (const f of fios.values()) {
+    const a = docs.get(f.c.a), b = docs.get(f.c.b); if (!a || !b) continue;
+    const ax = a.cur.x, ay = a.cur.y, bx = b.cur.x, by = b.cur.y;
+    const dist = Math.hypot(bx - ax, by - ay);
+    const cx = (ax + bx) / 2, cy = (ay + by) / 2 + Math.min(dist * 0.22 + 14, 130);
+    const dpath = `M${ax.toFixed(1)} ${ay.toFixed(1)} Q${cx.toFixed(1)} ${cy.toFixed(1)} ${bx.toFixed(1)} ${by.toFixed(1)}`;
+    f.sombra.setAttribute("d", dpath); f.fio.setAttribute("d", dpath); f.trama.setAttribute("d", dpath); f.hit.setAttribute("d", dpath);
+  }
+}
+async function ligar(d) {
+  if (!selLigar) { selLigar = d; return; }
+  if (selLigar === d) { selLigar = null; return; }
+  const a = selLigar.id, b = d.id; selLigar = null;
+  if (cordsDados.some(c => (c.a === a && c.b === b) || (c.a === b && c.b === a))) { toast("Esses dois já estão ligados."); return; }
+  const { cords } = lerQuadro(meta);
+  const id = idLivre(cords);
+  const up = { [PC + id]: { id, a, b } };
+  if (tamanho({ ...meta, ...up }) > 15500) { toast("Sem espaço na sala para mais linhas."); return; }
+  await OBR.room.setMetadata(up).catch(() => {});
+}
+function cortar(id) { OBR.room.setMetadata({ [PC + id]: { id, del: 1 } }).catch(() => {}); }
+
+/* ---------- lupa e leitor ---------- */
+const lente = $("#lente");
+function lente_em(clientX, clientY, u, v, wTela, hTela, imgUrl, toque) {
+  const S = 230, meio = S / 2 - 3, subir = toque ? S / 2 + 60 : 0;
+  lente.style.display = "block";
+  lente.style.left = (clientX - S / 2) + "px"; lente.style.top = (clientY - S / 2 - subir) + "px";
+  lente.style.backgroundImage = `url("${imgUrl}")`;
+  lente.style.backgroundSize = `${wTela * zoomLupa}px ${hTela * zoomLupa}px`;
+  lente.style.backgroundPosition = `${meio - u * wTela * zoomLupa}px ${meio - v * hTela * zoomLupa}px`;
+}
+document.addEventListener("pointermove", e => {
+  if (ferramenta !== "lupa" || $("#leitor").style.display === "flex") return;
+  const alvo = document.elementFromPoint(e.clientX, e.clientY)?.closest(".doc");
+  const d = alvo && docs.get(alvo.dataset.id || [...docs.values()].find(x => x.el === alvo)?.id);
+  if (!d) { lente.style.display = "none"; return; }
+  const p = paraStage(e), a = (d.cur.r + d.sw) * Math.PI / 180, w = d.data.w, h = w * d.data.ar;
+  const rx = p.x - d.cur.x, ry = p.y - d.cur.y;
+  const lx = rx * Math.cos(a) + ry * Math.sin(a), ly = -rx * Math.sin(a) + ry * Math.cos(a);
+  const u = (lx + w / 2) / w, v = (ly + PIN_OFF) / h;
+  if (u < 0 || u > 1 || v < 0 || v > 1) { lente.style.display = "none"; return; }
+  lente_em(e.clientX, e.clientY, u, v, w * escala, h * escala, d.data.img, e.pointerType === "touch");
+});
+document.addEventListener("wheel", e => {
+  const noLeitor = $("#leitor").style.display === "flex";
+  if (ferramenta !== "lupa" && !noLeitor) return;
+  e.preventDefault();
+  zoomLupa = clamp(zoomLupa * (e.deltaY < 0 ? 1.15 : 1 / 1.15), 1.5, 10);
+}, { passive: false, capture: true });
+
+function abrirLeitor(d) {
+  const L = $("#leitor"), img = L.querySelector("img");
+  img.src = d.data.img; L.style.display = "flex"; lente.style.display = "none";
+}
+function fecharLeitor() { $("#leitor").style.display = "none"; lente.style.display = "none"; }
+$("#leitor .x").onclick = fecharLeitor;
+$("#leitor").addEventListener("click", e => { if (e.target.id === "leitor") fecharLeitor(); });
+$("#leitor img").addEventListener("pointermove", e => {
+  const r = e.currentTarget.getBoundingClientRect();
+  const u = (e.clientX - r.left) / r.width, v = (e.clientY - r.top) / r.height;
+  lente_em(e.clientX, e.clientY, u, v, r.width, r.height, e.currentTarget.src, e.pointerType === "touch");
+});
+$("#leitor img").addEventListener("pointerleave", () => lente.style.display = "none");
+
+/* ---------- laço de animação (física) ---------- */
+let ultimo = performance.now();
+function quadro(agora) {
+  const dt = Math.min(0.05, (agora - ultimo) / 1000 || 0.016); ultimo = agora;
+  for (const d of docs.values()) {
+    if (d.coast) {
+      d.tgt.x += d.coast.vx * dt; d.tgt.y += d.coast.vy * dt;
+      if (d.tgt.x < 14 || d.tgt.x > STAGE_W - 14) { d.coast.vx *= -0.35; d.tgt.x = clamp(d.tgt.x, 14, STAGE_W - 14); }
+      if (d.tgt.y < 14 || d.tgt.y > STAGE_H - 14) { d.coast.vy *= -0.35; d.tgt.y = clamp(d.tgt.y, 14, STAGE_H - 14); }
+      const atrito = Math.pow(0.04, dt); d.coast.vx *= atrito; d.coast.vy *= atrito;
+      transmitir(d);
+      if (Math.hypot(d.coast.vx, d.coast.vy) < 25) { d.coast = null; salvarDoc(d); }
+    }
+    const remoto = agora < d.remoteUntil;
+    const k = d.drag ? 0.5 : d.coast ? 0.6 : 0.28;
+    const f = 1 - Math.pow(1 - k, dt * 60);
+    const px = d.cur.x;
+    d.cur.x += (d.tgt.x - d.cur.x) * f; d.cur.y += (d.tgt.y - d.cur.y) * f; d.cur.r += (d.tgt.r - d.cur.r) * f;
+    const vx = (d.cur.x - px) / dt;
+    // balanço: o papel "pendura" no alfinete e oscila ao ser puxado
+    const alvoSw = clamp(-vx * 0.02, -15, 15);
+    d.swv += (-(d.sw - alvoSw) * 150 - d.swv * 9) * dt;
+    d.sw += d.swv * dt;
+    const lev = d.drag || !!d.coast || remoto;
+    const ang = d.cur.r + d.sw;
+    d.el.style.transform = `translate(${d.cur.x - d.data.w / 2}px, ${d.cur.y - PIN_OFF}px) rotate(${ang}deg) scale(${lev ? 1.035 : 1})`;
+    d.pin.style.transform = `translate(${d.cur.x - 12}px, ${d.cur.y - 12}px)`;
+    if (lev !== d.wasLev) {
+      d.el.classList.toggle("lev", lev); d.pin.classList.toggle("off", lev);
+      if (!lev) { d.pin.classList.remove("pop"); void d.pin.offsetWidth; d.pin.classList.add("pop"); }
+      d.wasLev = lev;
+    }
+    d.el.classList.toggle("sel", selLigar === d);
+  }
+  atualizarFios();
+  requestAnimationFrame(quadro);
+}
+requestAnimationFrame(quadro);
+
+OBR.onReady(async () => {
+  aplicarMeta(await OBR.room.getMetadata());
+  OBR.room.onMetadataChange(aplicarMeta);
+  OBR.broadcast.onMessage(CH_MOV, aoReceberMov);
+});
+</script>
+</body>
+</html>
