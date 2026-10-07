@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quadro</title>
+<style>
+  :root { --bg:#1e2231; --card:#2a3045; --line:#3a4260; --text:#e8e6f0; --muted:#9aa0b8; --acc:#7a5cd6; --ok:#3f8f5a; --bad:#a64848; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; }
+  body { background:var(--bg); color:var(--text); font-family:system-ui,sans-serif; font-size:13px; padding:12px; overflow:auto; }
+  [hidden] { display:none !important; }
+  h1 { margin:0 0 8px; font-size:15px; letter-spacing:.06em; text-transform:uppercase; }
+  h2 { margin:14px 0 6px; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; }
+  button { border:0; border-radius:6px; padding:7px 10px; font-size:12px; font-weight:600; color:#fff; background:var(--line); cursor:pointer; }
+  button:hover { filter:brightness(1.2); } button.p { background:var(--acc); } button.ok { background:var(--ok); } button.bad { background:var(--bad); }
+  button.grande { width:100%; padding:11px; font-size:14px; }
+  input, select { width:100%; padding:7px; border-radius:6px; border:1px solid #444b66; background:#14171f; color:var(--text); font-size:13px; }
+  .card { background:var(--card); border-radius:10px; padding:10px; }
+  .row { display:flex; gap:8px; align-items:center; } .row > * { flex:1; }
+  .btns { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+  small.dica { display:block; margin-top:6px; color:var(--muted); font-size:11px; line-height:1.4; }
+  #prev { width:64px; height:64px; flex:none; border-radius:8px; background:#14171f; display:flex; align-items:center; justify-content:center; overflow:hidden; color:var(--muted); font-size:10px; text-align:center; }
+  #prev img { max-width:100%; max-height:100%; }
+  .doc { background:var(--card); border-radius:8px; padding:6px; margin-bottom:6px; display:flex; gap:8px; align-items:center; }
+  .doc .t { width:44px; height:44px; flex:none; background:#14171f; border-radius:6px; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+  .doc .t img { max-width:100%; max-height:100%; }
+  .doc .n { flex:1; font-size:12px; } .doc .b { display:flex; gap:4px; flex-wrap:wrap; justify-content:flex-end; }
+  .doc button { padding:5px 7px; }
+  #toast { position:fixed; left:50%; bottom:12px; transform:translateX(-50%); background:#000d; color:#fff; padding:8px 14px; border-radius:20px; font-size:12px; opacity:0; pointer-events:none; transition:opacity .25s; max-width:92%; text-align:center; }
+  #toast.v { opacity:1; }
+</style>
+</head>
+<body>
+  <h1>Quadro de Investigação</h1>
+  <button id="abrir" class="p grande">Abrir quadro</button>
+
+  <div id="jog" hidden><small class="dica">Abrindo o quadro em tela cheia…</small></div>
+
+  <div id="gm" hidden>
+    <h2>Adicionar documento</h2>
+    <div class="card">
+      <div class="row">
+        <div id="prev">sem imagem</div>
+        <div>
+          <div class="btns" style="margin:0">
+            <button id="lib">Biblioteca Owlbear</button>
+            <button id="up">Enviar imagem nova</button>
+            <input id="file" type="file" accept="image/*" hidden>
+          </div>
+        </div>
+      </div>
+      <input id="url" placeholder="ou cole o link (https://...) da imagem" style="margin-top:8px">
+      <div class="row" style="margin-top:8px">
+        <select id="tam"><option value="200">Pequeno</option><option value="260" selected>Médio</option><option value="340">Grande</option><option value="440">Muito grande</option></select>
+        <button id="add" class="ok">Adicionar ao quadro</button>
+      </div>
+      <small class="dica">“Enviar imagem nova” manda o arquivo para a sua biblioteca do Owlbear. Depois clique em “Biblioteca Owlbear” e escolha a imagem.</small>
+    </div>
+
+    <h2>Itens no quadro (<span id="cont">0</span>)</h2>
+    <div id="lista"></div>
+    <div class="btns"><button id="limpar" class="bad">Limpar quadro</button></div>
+  </div>
+  <div id="toast"></div>
+
+<script type="module">
+import OBR, { buildImageUpload } from "https://esm.sh/@owlbear-rodeo/sdk@3";
+import { BASE, PD, PC, PM, MODAL_ID, lerQuadro, idLivre, tamanho, arred } from "./lib.js";
+
+const $ = s => document.querySelector(s);
+let imgAtual = "", meta = {}, papel = "PLAYER", ultimaAbertura = 0;
+
+let toastT;
+function toast(m) { const t = $("#toast"); t.textContent = m; t.classList.add("v"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("v"), 2600); }
+function confirma(btn, texto, fn) {
+  let t;
+  btn.onclick = () => {
+    if (btn.dataset.c) { clearTimeout(t); delete btn.dataset.c; btn.textContent = texto; fn(); return; }
+    btn.dataset.c = 1; btn.textContent = "Confirmar?";
+    t = setTimeout(() => { delete btn.dataset.c; btn.textContent = texto; }, 3000);
+  };
+}
+
+async function abrirQuadro() {
+  if (Date.now() - ultimaAbertura < 1200) return;
+  ultimaAbertura = Date.now();
+  await OBR.modal.open({ id: MODAL_ID, url: BASE + "quadro.html", fullScreen: true, hidePaper: true });
+  try { await OBR.action.close(); } catch (e) {}
+}
+
+async function gravar(update) {
+  const atual = await OBR.room.getMetadata();
+  if (tamanho({ ...atual, ...update }) > 15500) { toast("Sem espaço na sala. Remova algum documento."); return false; }
+  await OBR.room.setMetadata(update); return true;
+}
+
+function mostrarImg(url) {
+  imgAtual = url || "";
+  const p = $("#prev"); p.innerHTML = "";
+  if (imgAtual) { const i = document.createElement("img"); i.src = imgAtual; p.append(i); } else p.textContent = "sem imagem";
+  $("#url").value = imgAtual;
+}
+
+async function adicionar() {
+  if (!imgAtual) { toast("Escolha uma imagem primeiro."); return; }
+  const dim = await new Promise(res => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = imgAtual; });
+  if (!dim) { toast("Não consegui carregar essa imagem."); return; }
+  const { docs } = lerQuadro(meta);
+  const id = idLivre(docs);
+  const z = docs.reduce((m, d) => Math.max(m, d.z || 0), 0) + 1;
+  const doc = {
+    id, img: imgAtual, w: parseInt($("#tam").value, 10), ar: arred(dim.naturalHeight / dim.naturalWidth, 3),
+    x: arred(800 + (Math.random() - .5) * 500), y: arred(450 + (Math.random() - .5) * 300),
+    rot: arred((Math.random() - .5) * 14), z, pc: Math.floor(Math.random() * 4)
+  };
+  if (await gravar({ [PD + id]: doc })) { toast("Documento adicionado."); mostrarImg(""); }
+}
+
+async function mudarDoc(d, fn) { await OBR.room.setMetadata({ [PD + d.id]: fn({ ...d }) }); }
+async function remover(d) {
+  const { cords, marks } = lerQuadro(meta);
+  const up = { [PD + d.id]: { id: d.id, del: 1 } };
+  for (const c of cords) if (!c.del && (c.a === d.id || c.b === d.id)) up[PC + c.id] = { id: c.id, del: 1 };
+  for (const m of marks) if (!m.del && m.d === d.id) up[PM + m.id] = { id: m.id, del: 1 };
+  await OBR.room.setMetadata(up);
+}
+async function limpar() {
+  const { docs, cords, marks } = lerQuadro(meta); const up = {};
+  for (const d of docs) up[PD + d.id] = { id: d.id, del: 1 };
+  for (const c of cords) up[PC + c.id] = { id: c.id, del: 1 };
+  for (const m of marks) up[PM + m.id] = { id: m.id, del: 1 };
+  await OBR.room.setMetadata(up); toast("Quadro limpo.");
+}
+
+function renderLista() {
+  const { docs } = lerQuadro(meta);
+  const vivos = docs.filter(d => !d.del).sort((a, b) => (a.z || 0) - (b.z || 0));
+  $("#cont").textContent = vivos.length;
+  const box = $("#lista"); box.innerHTML = "";
+  vivos.forEach((d, i) => {
+    const row = document.createElement("div"); row.className = "doc";
+    const ehNota = d.kind === "nota", ehFita = d.kind === "fita";
+    const nome = ehNota ? "Nota: " + String(d.txt || "").slice(0, 28) : ehFita ? "Gravação antiga (removida)" : "Documento " + (i + 1);
+    row.innerHTML = `<div class="t">${ehNota ? "📝" : ehFita ? "📼" : `<img src="${String(d.img).replace(/"/g, "")}" alt="">`}</div><div class="n"></div><div class="b"></div>`;
+    row.querySelector(".n").textContent = nome;
+    const b = row.querySelector(".b");
+    const mk = (txt, fn) => { const x = document.createElement("button"); x.textContent = txt; x.onclick = fn; b.append(x); return x; };
+    if (!ehNota) {
+      mk("−", () => mudarDoc(d, o => (o.w = Math.max(120, Math.round(o.w * 0.85)), o)));
+      mk("+", () => mudarDoc(d, o => (o.w = Math.min(560, Math.round(o.w * 1.18)), o)));
+    }
+    mk("Centralizar", () => mudarDoc(d, o => (o.x = 800, o.y = 450, o.z = (vivos[vivos.length - 1].z || 0) + 1, o)));
+    const r = mk("Remover", () => {}); r.className = "bad"; confirma(r, "Remover", () => remover(d));
+    box.append(row);
+  });
+  if (!vivos.length) box.innerHTML = '<small class="dica">Nenhum documento ainda.</small>';
+}
+
+function aplicarPapel(p) {
+  papel = p;
+  $("#gm").hidden = p !== "GM"; $("#jog").hidden = p === "GM";
+  renderLista();
+}
+
+$("#abrir").onclick = abrirQuadro;
+$("#lib").onclick = async () => {
+  try {
+    const res = await OBR.assets.downloadImages(false);
+    const pr = Array.isArray(res) ? res[0] : res;
+    const url = pr?.image?.url || pr?.url;
+    if (url) mostrarImg(url);
+  } catch (e) { toast("Não consegui abrir a biblioteca. Use o campo de link."); }
+};
+$("#up").onclick = () => $("#file").click();
+$("#file").onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  try {
+    const dados = await f.arrayBuffer();
+    await OBR.assets.uploadImages([buildImageUpload(new File([dados], f.name, { type: f.type })).build()]);
+    toast("Enviada! Agora clique em “Biblioteca Owlbear” e escolha a imagem.");
+  } catch (err) { toast("Não consegui enviar a imagem."); }
+};
+$("#url").onchange = e => { const v = e.target.value.trim(); if (/^https:\/\//.test(v)) mostrarImg(v); else if (v) toast("O link precisa começar com https://"); };
+$("#add").onclick = adicionar;
+confirma($("#limpar"), "Limpar quadro", limpar);
+
+OBR.onReady(async () => {
+  meta = await OBR.room.getMetadata();
+  aplicarPapel(await OBR.player.getRole());
+  OBR.player.onChange(p => { if (p.role !== papel) aplicarPapel(p.role); });
+  OBR.room.onMetadataChange(m => { meta = m; renderLista(); });
+  // Jogadores: ao clicar na extensão, o quadro abre em tela cheia.
+  const auto = () => { if (papel !== "GM") abrirQuadro(); };
+  try { if (await OBR.action.isOpen()) auto(); OBR.action.onOpenChange(o => { if (o) auto(); }); } catch (e) {}
+});
+</script>
+</body>
+</html>
