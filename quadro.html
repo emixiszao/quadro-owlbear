@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quadro de Investigação</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin:0; height:100%; overflow:hidden; font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:none; }
+  body {
+    background:
+      radial-gradient(ellipse at center, rgba(0,0,0,0) 50%, rgba(0,0,0,.5) 100%),
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><filter id='a' x='0' y='0' width='1' height='1'><feTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='3' seed='7' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .30  0 0 0 0 .17  0 0 0 0 .07  0 0 0 2.6 -.95'/></filter><filter id='b' x='0' y='0' width='1' height='1'><feTurbulence type='fractalNoise' baseFrequency='.02' numOctaves='3' seed='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .22  0 0 0 0 .13  0 0 0 0 .05  0 0 0 1.4 -.45'/></filter><filter id='c' x='0' y='0' width='1' height='1'><feTurbulence type='fractalNoise' baseFrequency='1.6' numOctaves='2' seed='11' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .95  0 0 0 0 .82  0 0 0 0 .6  0 0 0 2.4 -1.35'/></filter><rect width='100%' height='100%' fill='%23b88a5b'/><rect width='100%' height='100%' filter='url(%23b)'/><rect width='100%' height='100%' filter='url(%23a)'/><rect width='100%' height='100%' filter='url(%23c)'/></svg>"),
+      #b88a5b;
+  }
+  #moldura { position:fixed; inset:0; pointer-events:none; z-index:50; box-shadow:inset 0 0 0 16px #5b3a22, inset 0 0 0 18px #3a2414, inset 0 0 70px 20px rgba(0,0,0,.55); }
+  #stage { position:absolute; left:50%; top:50%; width:1600px; height:900px; transform-origin:center center; }
+  #docs, #pins, #cords { position:absolute; left:0; top:0; width:1600px; height:900px; }
+  #docs { z-index:1; } #cords { z-index:2; overflow:visible; pointer-events:none; } #pins { z-index:3; pointer-events:none; }
+  body.t-mover, body.t-ligar, body.t-lupa { cursor:grab; } body.t-escrever { cursor:text; } body.t-marca { cursor:default; }
+  body.panning, body.panning * { cursor:grabbing !important; }
+
+  /* documentos (PNG com transparência ficam sem fundo) */
+  .doc { position:absolute; left:0; top:0; cursor:grab; touch-action:none; filter:drop-shadow(0 3px 4px rgba(0,0,0,.45)); }
+  .doc > img { display:block; width:100%; height:100%; pointer-events:none; }
+  .doc.lev { filter:drop-shadow(0 16px 14px rgba(0,0,0,.5)); cursor:grabbing; }
+  .doc.sel { outline:4px solid #ffd54a; outline-offset:3px; }
+  .doc.quebrado { display:flex; align-items:center; justify-content:center; background:#ddd; color:#555; font-size:13px; text-align:center; }
+  body.t-ligar .doc { cursor:crosshair; } body.t-lupa .doc { cursor:zoom-in; } body.t-marca .doc { cursor:crosshair; } body.t-escrever .doc.nota { cursor:text; }
+  .doc svg.marcas { position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none; overflow:hidden; }
+  .doc svg.marcas path { fill:none; stroke-linecap:butt; stroke-linejoin:round; opacity:.55; mix-blend-mode:multiply; }
+  body.borracha .doc svg.marcas path:not(.prev) { pointer-events:stroke; cursor:pointer; }
+  body.borracha .doc { cursor:default; }
+
+  /* papéis escritos à mão */
+  .doc.nota { box-sizing:border-box; padding:24px 14px 12px; overflow:hidden; color:#1b2a4a; font-family:'Caveat','Segoe Script','Bradley Hand',cursive; font-weight:500; font-size:30px; line-height:34px; border-radius:2px;
+              background-image:repeating-linear-gradient(transparent 0 33px, rgba(110,140,180,.38) 33px 34px); background-position:0 24px; }
+  .doc.nota.p0 { background-color:#f7f1dd; } .doc.nota.p1 { background-color:#f6e98f; } .doc.nota.p2 { background-color:#dcebf6; } .doc.nota.p3 { background-color:#e3c898; }
+  .nota-txt { white-space:pre-wrap; word-break:break-word; text-shadow:0 0 .6px rgba(27,42,74,.45); pointer-events:none; }
+  .nota-ed { display:block; box-sizing:border-box; width:100%; min-height:34px; border:0; outline:none; resize:none; background:transparent; color:inherit; font:inherit; line-height:34px; padding:0; overflow:hidden; user-select:text; -webkit-user-select:text; cursor:text; }
+  .nota-apagar { position:absolute; right:4px; top:3px; width:22px; height:22px; border:0; border-radius:50%; background:#a64848; color:#fff; font-size:12px; line-height:22px; padding:0; cursor:pointer; }
+
+  /* post-its */
+  .doc.nota.s0 { background-color:#f7f1dd; } .doc.nota.s1 { background-color:#e3c898; }
+  .doc.nota.postit { border-radius:1px 1px 7px 1px; background-image:linear-gradient(to bottom, rgba(255,255,255,.38) 0, rgba(255,255,255,0) 28px), linear-gradient(to top, rgba(0,0,0,.10) 0, rgba(0,0,0,0) 22px); line-height:31px; color:#3b2f12; text-shadow:none; }
+  .doc.nota.s2 { background-color:#fff176; } .doc.nota.s3 { background-color:#ff9ec4; } .doc.nota.s4 { background-color:#a5e887; } .doc.nota.s5 { background-color:#8fd3ff; } .doc.nota.s6 { background-color:#ffb066; }
+  .doc.nota.postit .nota-ed { line-height:31px; }
+
+  /* fitas e gravadores */
+  .doc.fita { cursor:pointer; }
+  .doc.fita > svg:first-child { display:block; width:100%; height:100%; pointer-events:none; overflow:visible; }
+  .fita .reel { transform-box:fill-box; transform-origin:center; animation:giro 1.3s linear infinite; animation-play-state:paused; }
+  .fita.tocando .reel { animation-play-state:running; }
+  @keyframes giro { to { transform:rotate(360deg); } }
+  .fita .luz-rec { opacity:.3; } .fita.tocando .luz-rec { animation:piscar 1s steps(2) infinite; }
+  @keyframes piscar { 50% { opacity:1; } }
+  .fita .eq { transform-box:fill-box; transform-origin:bottom; transform:scaleY(.15); }
+  .fita.tocando .eq { animation:eq .45s ease-in-out infinite alternate; }
+  @keyframes eq { from { transform:scaleY(.15); } to { transform:scaleY(1); } }
+  .fita .fprog { position:absolute; left:6%; right:6%; bottom:-9px; height:5px; border-radius:3px; background:rgba(0,0,0,.35); overflow:hidden; opacity:0; transition:opacity .2s; }
+  .fita.tocando .fprog, .fita.temprog .fprog { opacity:1; }
+  .fita .fprog i { display:block; height:100%; width:calc(var(--prog,0) * 100%); background:#ff4b3e; }
+  .fita .fbtn { position:absolute; left:50%; top:50%; width:46px; height:46px; margin:-23px 0 0 -23px; border-radius:50%; background:rgba(0,0,0,.55); color:#fff; font-size:20px; line-height:46px; text-align:center; opacity:0; transition:opacity .15s; pointer-events:none; }
+  .fita .fbtn::before { content:"\25B6"; } .fita.tocando .fbtn::before { content:"\23F8"; }
+  .fita:hover .fbtn, .fita.tocando .fbtn { opacity:.85; }
+
+  .pin { position:absolute; left:0; top:0; width:24px; height:24px; transition:opacity .1s; }
+  .pin.off { opacity:0; } .pin svg { display:block; }
+  .pin.pop svg { animation:pinpop .28s cubic-bezier(.2,1.4,.4,1); }
+  @keyframes pinpop { from { transform:scale(2) translateY(-6px); opacity:.2; } to { transform:none; opacity:1; } }
+  .fio-hit { stroke:transparent; stroke-width:16; fill:none; pointer-events:none; }
+  body.t-ligar .fio-hit { pointer-events:stroke; cursor:pointer; }
+
+  #barra { position:fixed; left:50%; bottom:30px; transform:translateX(-50%); z-index:60; display:flex; gap:6px; padding:8px; background:rgba(25,22,20,.88); border-radius:14px; box-shadow:0 6px 24px #0009; }
+  #barra button, #subbarra button { border:0; border-radius:9px; padding:9px 13px; background:#3a3430; color:#eee; font-size:14px; cursor:pointer; white-space:nowrap; }
+  #barra button:hover, #subbarra button:hover { background:#4b433d; } #barra button.on, #subbarra button.on { background:#f3e7cf; color:#222; }
+  #barra .sep { width:1px; background:#ffffff30; margin:2px 2px; }
+  #subbarra { position:fixed; left:50%; bottom:92px; transform:translateX(-50%); z-index:60; display:none; gap:6px; padding:7px; background:rgba(25,22,20,.88); border-radius:12px; box-shadow:0 6px 24px #0009; align-items:center; }
+  #subbarra button { padding:6px 10px; font-size:13px; }
+  #subbarra .cor { width:28px; height:28px; padding:0; border-radius:50%; border:3px solid transparent; } #subbarra .cor.on { border-color:#fff; background:inherit; }
+  #dica { position:fixed; left:50%; bottom:142px; transform:translateX(-50%); z-index:60; padding:6px 12px; border-radius:20px; background:rgba(0,0,0,.65); color:#eee; font-size:13px; pointer-events:none; text-align:center; max-width:86vw; }
+  body.sub #dica { bottom:142px; } body:not(.sub) #dica { bottom:92px; }
+  /* luz de lâmpada */
+  #luz { position:fixed; inset:0; pointer-events:none; z-index:40; --lc:255,208,112; --ld:16,9,0; --f:1; }
+  #luz div { position:absolute; inset:0; transition:opacity .05s; }
+  #luz-sombra { background:radial-gradient(ellipse 90% 105% at 50% 2%, rgba(var(--ld),0) 16%, rgba(var(--ld),.34) 52%, rgba(var(--ld),.72) 100%); opacity:min(1, calc(.85 + (1 - var(--f)) * .6)); }
+  #luz-cor { background:radial-gradient(ellipse 78% 92% at 50% 0%, rgba(var(--lc),.58) 0%, rgba(var(--lc),.24) 46%, rgba(var(--lc),0) 80%); mix-blend-mode:overlay; opacity:var(--f); }
+  #luz-brilho { background:radial-gradient(ellipse 46% 58% at 50% 0%, rgba(var(--lc),.34) 0%, rgba(var(--lc),0) 72%); mix-blend-mode:screen; opacity:var(--f); animation:respira 5s ease-in-out infinite; }
+  @keyframes respira { 0%,100% { filter:brightness(1); } 50% { filter:brightness(.86); } }
+  #luzbarra { position:fixed; left:50%; bottom:92px; transform:translateX(-50%); z-index:61; display:none; gap:8px; padding:8px 10px; background:rgba(25,22,20,.92); border-radius:12px; box-shadow:0 6px 24px #0009; align-items:center; }
+  #luzbarra button { border:0; border-radius:9px; padding:6px 10px; background:#3a3430; color:#eee; font-size:13px; cursor:pointer; display:flex; align-items:center; gap:6px; }
+  #luzbarra button.on { background:#f3e7cf; color:#222; } #luzbarra i { width:14px; height:14px; border-radius:50%; display:inline-block; border:1px solid #0006; }
+  #fechar { position:fixed; top:26px; right:28px; z-index:60; width:38px; height:38px; border:0; border-radius:50%; background:rgba(25,22,20,.88); color:#fff; font-size:18px; cursor:pointer; }
+  #fechar:hover { background:#a64848; }
+
+  #lente { position:fixed; display:none; width:230px; height:230px; box-sizing:border-box; border:3px solid #fff; border-radius:50%; background:#000 no-repeat; box-shadow:0 8px 30px #000b; pointer-events:none; z-index:90; }
+  #leitor { position:fixed; inset:0; z-index:80; display:none; align-items:center; justify-content:center; background:rgba(8,6,5,.92); }
+  #leitor img { max-width:90vw; max-height:86vh; box-shadow:0 10px 50px #000; cursor:crosshair; }
+  #leitor .x { position:absolute; top:26px; right:28px; width:38px; height:38px; border:0; border-radius:50%; background:#ffffff22; color:#fff; font-size:18px; cursor:pointer; }
+  #leitor small { position:absolute; bottom:22px; left:0; right:0; text-align:center; color:#aaa; font-size:13px; }
+  #toast { position:fixed; left:50%; top:30px; transform:translateX(-50%); z-index:95; background:#000d; color:#fff; padding:8px 14px; border-radius:20px; font-size:13px; opacity:0; pointer-events:none; transition:opacity .25s; }
+  #toast.v { opacity:1; }
+</style>
+</head>
+<body class="t-mover">
+<div id="stage">
+  <div id="docs"></div>
+  <svg id="cords" viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg"></svg>
+  <div id="pins"></div>
+</div>
+<div id="luz"><div id="luz-sombra"></div><div id="luz-cor"></div><div id="luz-brilho"></div></div>
+<div id="moldura"></div>
+
+<div id="dica"></div>
+<div id="subbarra"></div>
+<div id="luzbarra"></div>
+<div id="barra">
+  <button data-f="mover" class="on">✋ Mover</button>
+  <button data-f="ligar">🧶 Ligar</button>
+  <button data-f="escrever">✍️ Escrever</button>
+  <button data-f="marca">🖍 Marca-texto</button>
+  <button data-f="lupa">🔍 Lupa</button>
+  <span class="sep"></span>
+  <button id="luzbtn" title="Cor da luz">💡 Luz</button>
+  <button id="mudobtn" title="Som das gravações (só para você)">🔊</button>
+  <button id="zoomreset" title="Voltar ao tamanho normal">100%</button>
+</div>
+<button id="fechar" title="Fechar o quadro">✕</button>
+
+<div id="leitor"><button class="x">✕</button><img alt=""><small>Passe o mouse para usar a lupa · roda do mouse muda o zoom · clique fora ou Esc para fechar</small></div>
+<div id="lente"></div>
+<div id="toast"></div>
+
+<script type="module">
+import OBR from "https://esm.sh/@owlbear-rodeo/sdk@3";
+import { PD, PC, PM, CH_MOV, CH_FITA, FITAS, fitaSVG, MODAL_ID, STAGE_W, STAGE_H, PIN_OFF, MARCA_CORES, lerQuadro, idLivre, novoId, tamanho, arred, pinSVG } from "./lib.js";
+
+const $ = s => document.querySelector(s);
+const stage = $("#stage"), docsEl = $("#docs"), pinsEl = $("#pins"), svg = $("#cords");
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const SVGNS = "http://www.w3.org/2000/svg";
+
+const docs = new Map(), fios = new Map();
+let cordsDados = [], marksPorDoc = new Map(), meta = {};
+let ferramenta = "mover";
+let escala = 1, zoom = 1, vx = 0, vy = 0;
+let maxZ = 1, selLigar = null, zoomLupa = 3;
+let marcaCor = 0, marcaEsp = 1, borracha = false;
+let notaEstilo = 0;
+const ESTILOS_NOTA = [["Papel", "#f7f1dd"], ["Pardo", "#e3c898"], ["Post-it", "#fff176"], ["Post-it", "#ff9ec4"], ["Post-it", "#a5e887"], ["Post-it", "#8fd3ff"], ["Post-it", "#ffb066"]];
+const pilhaMarcas = [];
+
+let toastT;
+function toast(m) { const t = $("#toast"); t.textContent = m; t.classList.add("v"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("v"), 2400); }
+const esc = () => escala * zoom;
+
+/* ---------- vista (zoom e movimento do quadro) ---------- */
+function aplicarVista() {
+  escala = Math.min(innerWidth / STAGE_W, innerHeight / STAGE_H);
+  const S = esc();
+  if (zoom <= 1.001) { vx = 0; vy = 0; }
+  else {
+    const lx = Math.max(0, (STAGE_W * S - innerWidth) / 2) + 140, ly = Math.max(0, (STAGE_H * S - innerHeight) / 2) + 140;
+    vx = clamp(vx, -lx, lx); vy = clamp(vy, -ly, ly);
+  }
+  stage.style.transform = `translate(-50%,-50%) translate(${vx}px,${vy}px) scale(${S})`;
+  $("#zoomreset").textContent = Math.round(zoom * 100) + "%";
+}
+function paraStage(e) {
+  const r = stage.getBoundingClientRect(), S = esc();
+  return { x: (e.clientX - r.left) / S, y: (e.clientY - r.top) / S };
+}
+function zoomVista(cx, cy, fator) {
+  const p = paraStage({ clientX: cx, clientY: cy });
+  zoom = clamp(zoom * fator, 1, 6);
+  const S = esc();
+  vx = cx - innerWidth / 2 - (p.x - STAGE_W / 2) * S;
+  vy = cy - innerHeight / 2 - (p.y - STAGE_H / 2) * S;
+  aplicarVista();
+}
+addEventListener("resize", aplicarVista); aplicarVista();
+$("#zoomreset").onclick = () => { zoom = 1; aplicarVista(); };
+
+const leitorAberto = () => $("#leitor").style.display === "flex";
+document.addEventListener("wheel", e => {
+  if (e.target.closest && e.target.closest("textarea")) return;
+  if (leitorAberto()) { e.preventDefault(); zoomLupa = clamp(zoomLupa * (e.deltaY < 0 ? 1.15 : 1 / 1.15), 1.5, 10); return; }
+  if (e.target.closest && e.target.closest("#barra,#subbarra,#luzbarra")) return;
+  e.preventDefault();
+  const dy = e.deltaY || e.deltaX;
+  if (e.shiftKey) {
+    if (ferramenta === "lupa") zoomLupa = clamp(zoomLupa * (dy < 0 ? 1.15 : 1 / 1.15), 1.5, 10);
+    else { const el = e.target.closest && e.target.closest(".doc"); const d = el && docs.get(el.dataset.id); if (d) girar(d, dy < 0 ? -1 : 1); }
+    return;
+  }
+  zoomVista(e.clientX, e.clientY, dy < 0 ? 1.13 : 1 / 1.13);
+}, { passive: false, capture: true });
+
+/* mover o quadro arrastando o fundo */
+document.addEventListener("pointerdown", e => {
+  if (e.button !== 0 && e.button !== 1) return;
+  if (e.target.closest(".doc,#barra,#subbarra,#luzbarra,#fechar,#leitor")) return;
+  if (ferramenta === "escrever" && e.button === 0) { e.preventDefault(); criarNota(paraStage(e)); return; }
+  const x0 = e.clientX, y0 = e.clientY, vx0 = vx, vy0 = vy;
+  document.body.classList.add("panning");
+  const mv = ev => { vx = vx0 + ev.clientX - x0; vy = vy0 + ev.clientY - y0; aplicarVista(); };
+  const up = () => { document.body.classList.remove("panning"); removeEventListener("pointermove", mv); removeEventListener("pointerup", up); };
+  addEventListener("pointermove", mv); addEventListener("pointerup", up);
+});
+
+/* ---------- ferramentas ---------- */
+const DICAS = {
+  mover: "Arraste os papéis · arraste o fundo para andar · roda do mouse dá zoom · Shift+roda gira · duplo clique abre",
+  ligar: "Clique em dois papéis para ligar com a linha · clique numa linha para cortar",
+  escrever: "Escolha o papel ou post-it · clique num espaço vazio para criar · clique num escrito para editar",
+  marca: "Arraste sobre um documento para marcar",
+  lupa: "Passe o mouse sobre um documento · Shift+roda muda o zoom da lupa"
+};
+function setFerramenta(f) {
+  ferramenta = f; selLigar = null; borracha = false;
+  document.body.className = "t-" + f + (f === "marca" || f === "escrever" ? " sub" : "");
+  document.querySelectorAll("#barra button[data-f]").forEach(b => b.classList.toggle("on", b.dataset.f === f));
+  $("#dica").textContent = DICAS[f]; $("#lente").style.display = "none";
+  montarSubbarra();
+}
+document.querySelectorAll("#barra button[data-f]").forEach(b => b.onclick = () => setFerramenta(b.dataset.f));
+$("#fechar").onclick = () => OBR.modal.close(MODAL_ID).catch(() => {});
+addEventListener("keydown", e => {
+  if (e.key === "Escape") { if (leitorAberto()) fecharLeitor(); else selLigar = null; }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && ferramenta === "marca") { e.preventDefault(); desfazerMarca(); }
+});
+
+function montarSubbarra() {
+  const sb = $("#subbarra"); sb.innerHTML = "";
+  if (ferramenta === "escrever") {
+    sb.style.display = "flex";
+    ESTILOS_NOTA.forEach(([nome, cor], i) => {
+      const b = document.createElement("button"); b.className = "cor" + (i === notaEstilo ? " on" : ""); b.style.background = cor; b.title = nome;
+      if (i >= 2) b.style.borderRadius = "4px";
+      b.onclick = () => { notaEstilo = i; montarSubbarra(); };
+      sb.append(b);
+    });
+    const t = document.createElement("span"); t.style.cssText = "color:#ccc;font-size:12px;margin-left:4px"; t.textContent = notaEstilo < 2 ? "papel" : "post-it"; sb.append(t);
+    return;
+  }
+  if (ferramenta !== "marca") { sb.style.display = "none"; return; }
+  sb.style.display = "flex";
+  MARCA_CORES.forEach((c, i) => {
+    const b = document.createElement("button"); b.className = "cor" + (i === marcaCor && !borracha ? " on" : ""); b.style.background = c; b.title = "Cor";
+    b.onclick = () => { marcaCor = i; borracha = false; document.body.classList.remove("borracha"); montarSubbarra(); };
+    sb.append(b);
+  });
+  const mk = (txt, on, fn) => { const b = document.createElement("button"); b.textContent = txt; if (on) b.className = "on"; b.onclick = fn; sb.append(b); };
+  mk("Fino", marcaEsp === 0, () => { marcaEsp = 0; montarSubbarra(); });
+  mk("Grosso", marcaEsp === 1, () => { marcaEsp = 1; montarSubbarra(); });
+  mk("🧽 Borracha", borracha, () => { borracha = !borracha; document.body.classList.toggle("borracha", borracha); montarSubbarra(); });
+  mk("↶ Desfazer", false, desfazerMarca);
+}
+
+/* ---------- documentos e papéis ---------- */
+const altura = d => d.data.w * d.data.ar;
+function criarDoc(v) {
+  const el = document.createElement("div"); el.className = "doc"; el.dataset.id = v.id;
+  const d = { id: v.id, el, data: { ...v }, cur: { x: v.x, y: v.y, r: v.rot }, tgt: { x: v.x, y: v.y, r: v.rot },
+              sw: 0, swv: 0, drag: false, coast: null, remoteUntil: 0, wasLev: false, ultimoEnvio: 0, editando: false, msig: "" };
+  if (v.kind === "fita") {
+    el.classList.add("fita");
+    el.innerHTML = fitaSVG(v.fm, v.txt, v.id) + '<div class="fprog"><i></i></div><div class="fbtn"></div>';
+  } else if (v.kind === "nota") {
+    el.classList.add("nota", v.st === undefined ? "p" + ((v.pc || 0) % 4) : "s" + v.st);
+    if (v.st >= 2) el.classList.add("postit");
+    d.txtEl = document.createElement("div"); d.txtEl.className = "nota-txt"; d.txtEl.textContent = v.txt || "";
+    el.append(d.txtEl);
+  } else {
+    const img = document.createElement("img"); img.src = v.img; img.draggable = false;
+    img.onerror = () => { el.classList.add("quebrado"); img.remove(); el.prepend("imagem indisponível"); };
+    el.append(img);
+  }
+  d.svgM = document.createElementNS(SVGNS, "svg"); d.svgM.setAttribute("class", "marcas"); el.append(d.svgM);
+  const pin = document.createElement("div"); pin.className = "pin"; pin.innerHTML = pinSVG(v.pc);
+  d.pin = pin; docsEl.append(el); pinsEl.append(pin);
+  dimensionar(d);
+  el.addEventListener("pointerdown", e => aoPressionar(e, d));
+  el.addEventListener("dblclick", () => { if (d.data.kind === "nota") editarNota(d); else if (ferramenta === "mover") abrirLeitor(d); });
+  docs.set(v.id, d); return d;
+}
+function dimensionar(d) {
+  const w = d.data.w, h = w * d.data.ar;
+  d.el.style.width = w + "px"; d.el.style.height = h + "px";
+  d.el.style.transformOrigin = `${w / 2}px ${PIN_OFF}px`;
+  d.el.style.zIndex = d.data.z;
+  d.svgM.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  d.msig = "";
+}
+function removerDoc(d) { pararAudio(d.id); d.el.remove(); d.pin.remove(); docs.delete(d.id); }
+
+async function escrever(update) {
+  if (tamanho({ ...meta, ...update }) > 15500) { toast("Sem espaço na sala. Remova alguma coisa do quadro."); return false; }
+  try { await OBR.room.setMetadata(update); } catch (e) { return false; }
+  return true;
+}
+function apagarItem(id) {
+  const { cords, marks } = lerQuadro(meta);
+  const up = { [PD + id]: { id, del: 1 } };
+  for (const c of cords) if (!c.del && (c.a === id || c.b === id)) up[PC + c.id] = { id: c.id, del: 1 };
+  for (const m of marks) if (!m.del && m.d === id) up[PM + m.id] = { id: m.id, del: 1 };
+  OBR.room.setMetadata(up).catch(() => {});
+}
+
+/* ---------- sincronização ---------- */
+function aplicarMeta(m) {
+  meta = m;
+  const { docs: lista, cords, marks } = lerQuadro(m);
+  const vivos = new Set();
+  for (const v of lista) {
+    if (v.del) continue;
+    vivos.add(v.id);
+    let d = docs.get(v.id);
+    if (!d) d = criarDoc(v);
+    else if (d.drag || d.coast || d.editando) { /* mantém o estado local */ }
+    else {
+      const tamMudou = d.data.w !== v.w || d.data.ar !== v.ar;
+      d.data = { ...v };
+      if (d.txtEl && d.txtEl.textContent !== (v.txt || "")) d.txtEl.textContent = v.txt || "";
+      if (tamMudou) dimensionar(d);
+      d.el.style.zIndex = v.z;
+      d.tgt.x = v.x; d.tgt.y = v.y; d.tgt.r = v.rot;
+    }
+    maxZ = Math.max(maxZ, v.z || 1);
+  }
+  for (const d of [...docs.values()]) if (!vivos.has(d.id) && !d.editando) removerDoc(d);
+  cordsDados = cords.filter(c => !c.del && docs.has(c.a) && docs.has(c.b));
+  montarFios();
+  marksPorDoc = new Map();
+  for (const mk of marks) { if (mk.del || !docs.has(mk.d)) continue; if (!marksPorDoc.has(mk.d)) marksPorDoc.set(mk.d, []); marksPorDoc.get(mk.d).push(mk); }
+  for (const d of docs.values()) renderMarcas(d);
+}
+
+function salvarDoc(d) {
+  const v = { ...d.data, x: arred(d.tgt.x), y: arred(d.tgt.y), rot: arred(d.tgt.r), z: d.data.z };
+  d.data = v;
+  OBR.room.setMetadata({ [PD + d.id]: v }).catch(() => {});
+}
+function transmitir(d) {
+  const agora = performance.now();
+  if (agora - d.ultimoEnvio < 40) return;
+  d.ultimoEnvio = agora;
+  OBR.broadcast.sendMessage(CH_MOV, { i: d.id, x: arred(d.tgt.x), y: arred(d.tgt.y), r: arred(d.tgt.r), z: d.data.z }, { destination: "REMOTE" }).catch(() => {});
+}
+function aoReceberMov(ev) {
+  const m = ev.data; if (!m) return;
+  const d = docs.get(m.i); if (!d || d.drag || d.coast || d.editando) return;
+  d.tgt.x = m.x; d.tgt.y = m.y; d.tgt.r = m.r;
+  if (m.z) { d.data.z = m.z; d.el.style.zIndex = m.z; maxZ = Math.max(maxZ, m.z); }
+  d.remoteUntil = performance.now() + 450;
+}
+
+/* ---------- interação com os papéis ---------- */
+function aoPressionar(e, d) {
+  if (e.button !== 0) return;
+  if (e.target.closest("textarea,.nota-apagar")) return;
+  if (ferramenta === "ligar") { ligar(d); return; }
+  if (ferramenta === "lupa") return;
+  if (ferramenta === "marca") { if (!borracha && d.data.kind !== "fita") iniciarMarca(e, d); return; }
+  if (ferramenta === "escrever" && d.data.kind === "nota") { e.preventDefault(); editarNota(d); return; }
+  if (d.editando) return;
+  e.preventDefault();
+  d.el.setPointerCapture(e.pointerId);
+  d.coast = null; d.drag = true;
+  d.data.z = ++maxZ; d.el.style.zIndex = d.data.z;
+  const p0 = paraStage(e);
+  const g = { px: p0.x, py: p0.y, x0: d.tgt.x, y0: d.tgt.y, t0: performance.now(), amostras: [{ t: performance.now(), x: p0.x, y: p0.y }] };
+  const mover = ev => {
+    const q = paraStage(ev), t = performance.now();
+    d.tgt.x = clamp(g.x0 + q.x - g.px, 14, STAGE_W - 14);
+    d.tgt.y = clamp(g.y0 + q.y - g.py, 14, STAGE_H - 14);
+    g.amostras.push({ t, x: q.x, y: q.y });
+    while (g.amostras.length > 2 && t - g.amostras[0].t > 110) g.amostras.shift();
+    transmitir(d);
+  };
+  const soltar = () => {
+    d.el.removeEventListener("pointermove", mover); d.el.removeEventListener("pointerup", soltar); d.el.removeEventListener("pointercancel", soltar);
+    d.drag = false;
+    if (d.data.kind === "fita" && ferramenta === "mover" && Math.hypot(d.tgt.x - g.x0, d.tgt.y - g.y0) < 6 && performance.now() - g.t0 < 500) { alternarFita(d); return; }
+    const a = g.amostras, p = a[0], u = a[a.length - 1], dt = (u.t - p.t) / 1000;
+    let vx_ = dt > 0.01 ? (u.x - p.x) / dt : 0, vy_ = dt > 0.01 ? (u.y - p.y) / dt : 0;
+    if (performance.now() - u.t > 90) vx_ = vy_ = 0;
+    const v = Math.hypot(vx_, vy_);
+    if (v > 2200) { vx_ *= 2200 / v; vy_ *= 2200 / v; }
+    if (v > 120) d.coast = { vx: vx_ * 0.85, vy: vy_ * 0.85 }; else salvarDoc(d);
+  };
+  d.el.addEventListener("pointermove", mover); d.el.addEventListener("pointerup", soltar); d.el.addEventListener("pointercancel", soltar);
+}
+function girar(d, dir) {
+  d.tgt.r += dir * 4; transmitir(d);
+  clearTimeout(d.tRot); d.tRot = setTimeout(() => salvarDoc(d), 400);
+}
+
+/* ---------- escrever (papéis à mão) ---------- */
+function criarNota(p) {
+  const { docs: lista } = lerQuadro(meta);
+  const post = notaEstilo >= 2, w = post ? 190 : 230;
+  const v = { id: idLivre(lista), kind: "nota", st: notaEstilo, txt: "", w, ar: 0.3, x: clamp(arred(p.x), w / 2 + 20, STAGE_W - w / 2 - 20), y: clamp(arred(p.y), 40, STAGE_H - 60),
+              rot: arred((Math.random() - .5) * (post ? 10 : 6)), z: ++maxZ, pc: Math.floor(Math.random() * 4) };
+  const d = criarDoc(v); d.novo = true;
+  editarNota(d);
+}
+function editarNota(d) {
+  if (d.editando) return;
+  d.editando = true; d.coast = null; d.drag = false;
+  const ta = document.createElement("textarea"); ta.className = "nota-ed"; ta.maxLength = 400; ta.rows = 1;
+  ta.value = d.data.txt || ""; ta.placeholder = "Escreva aqui...";
+  const apagar = document.createElement("button"); apagar.className = "nota-apagar"; apagar.textContent = "🗑"; apagar.title = "Apagar este papel";
+  d.txtEl.style.display = "none"; d.el.append(ta, apagar);
+  const ajustar = () => { ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; d.el.style.height = (ta.scrollHeight + 36) + "px"; };
+  ta.addEventListener("input", ajustar); ajustar(); setTimeout(() => { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 40);
+  apagar.addEventListener("mousedown", e => e.preventDefault());
+  apagar.addEventListener("click", () => { d.cancelar = true; ta.blur(); });
+  ta.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Escape" || (e.key === "Enter" && (e.ctrlKey || e.metaKey))) ta.blur(); });
+  ta.addEventListener("blur", async () => {
+    const txt = ta.value.trim().slice(0, 400), h = ta.scrollHeight + 36;
+    ta.remove(); apagar.remove(); d.txtEl.style.display = ""; d.editando = false;
+    const existe = meta[PD + d.id] && !meta[PD + d.id].del;
+    if (d.cancelar || !txt) { d.cancelar = false; if (existe) apagarItem(d.id); else removerDoc(d); return; }
+    d.data.txt = txt; d.txtEl.textContent = txt; d.data.ar = arred(h / d.data.w, 3); dimensionar(d);
+    const v = { ...d.data, x: arred(d.tgt.x), y: arred(d.tgt.y), rot: arred(d.tgt.r) };
+    d.data = v; d.novo = false;
+    if (!(await escrever({ [PD + d.id]: v }))) { if (!existe) removerDoc(d); }
+  });
+}
+
+/* ---------- marca-texto ---------- */
+function paraLocal(d, p) {
+  const a = (d.cur.r + d.sw) * Math.PI / 180, w = d.data.w, h = altura(d);
+  const rx = p.x - d.cur.x, ry = p.y - d.cur.y;
+  const lx = rx * Math.cos(a) + ry * Math.sin(a), ly = -rx * Math.sin(a) + ry * Math.cos(a);
+  return { u: (lx + w / 2) / w, v: (ly + PIN_OFF) / h };
+}
+const espPx = (d, e) => d.data.w * (e ? 0.07 : 0.035);
+function caminho(d, pts) { const w = d.data.w, h = altura(d); return pts.map((q, i) => (i ? "L" : "M") + (q[0] * w / 1000).toFixed(1) + " " + (q[1] * h / 1000).toFixed(1)).join(" "); }
+function distSeg(p, a, b) {
+  const dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy;
+  let t = l2 ? ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2 : 0; t = clamp(t, 0, 1);
+  return Math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy));
+}
+function simplificar(pts, tol) {
+  if (pts.length < 3) return pts;
+  let max = 0, idx = 0;
+  for (let i = 1; i < pts.length - 1; i++) { const dd = distSeg(pts[i], pts[0], pts[pts.length - 1]); if (dd > max) { max = dd; idx = i; } }
+  if (max > tol) { const l = simplificar(pts.slice(0, idx + 1), tol), r = simplificar(pts.slice(idx), tol); return l.slice(0, -1).concat(r); }
+  return [pts[0], pts[pts.length - 1]];
+}
+function renderMarcas(d) {
+  const lista = marksPorDoc.get(d.id) || [];
+  const sig = lista.map(m => m.id + m.c + m.e).join(",") + "|" + d.data.w + "|" + d.data.ar;
+  if (sig === d.msig) return; d.msig = sig;
+  d.svgM.innerHTML = "";
+  for (const m of lista) {
+    const pts = []; for (let i = 0; i < m.p.length; i += 2) pts.push([m.p[i], m.p[i + 1]]);
+    const path = document.createElementNS(SVGNS, "path");
+    path.setAttribute("d", caminho(d, pts)); path.setAttribute("stroke", MARCA_CORES[m.c] || MARCA_CORES[0]); path.setAttribute("stroke-width", espPx(d, m.e));
+    path.addEventListener("click", () => { if (borracha) apagarMarca(m.id); });
+    path.addEventListener("pointerenter", ev => { if (borracha && ev.buttons === 1) apagarMarca(m.id); });
+    d.svgM.append(path);
+  }
+}
+function iniciarMarca(e, d) {
+  e.preventDefault(); d.el.setPointerCapture(e.pointerId);
+  const pts = [], cor = marcaCor, esp = marcaEsp;
+  const prev = document.createElementNS(SVGNS, "path"); prev.setAttribute("class", "prev");
+  prev.setAttribute("stroke", MARCA_CORES[cor]); prev.setAttribute("stroke-width", espPx(d, esp)); d.svgM.append(prev);
+  const add = ev => { const q = paraLocal(d, paraStage(ev)); pts.push([clamp(q.u, 0, 1) * 1000, clamp(q.v, 0, 1) * 1000]); prev.setAttribute("d", caminho(d, pts)); };
+  add(e);
+  const mv = ev => add(ev);
+  const up = async ev => {
+    d.el.removeEventListener("pointermove", mv); d.el.removeEventListener("pointerup", up); d.el.removeEventListener("pointercancel", up);
+    prev.remove();
+    let s = pts; for (let tol = 5; tol < 80; tol += 8) { s = simplificar(pts, tol); if (s.length <= 24) break; }
+    if (s.length < 2 || Math.hypot(s[s.length - 1][0] - s[0][0], s[s.length - 1][1] - s[0][1]) < 12 && s.length < 3) return;
+    const { marks } = lerQuadro(meta);
+    const id = idLivre(marks);
+    const dados = { id, d: d.id, c: cor, e: esp, p: s.flatMap(q => [Math.round(q[0]), Math.round(q[1])]) };
+    aplicarMeta({ ...meta, [PM + id]: dados });
+    if (await escrever({ [PM + id]: dados })) pilhaMarcas.push(id);
+  };
+  d.el.addEventListener("pointermove", mv); d.el.addEventListener("pointerup", up); d.el.addEventListener("pointercancel", up);
+}
+function apagarMarca(id) { OBR.room.setMetadata({ [PM + id]: { id, del: 1 } }).catch(() => {}); aplicarMeta({ ...meta, [PM + id]: { id, del: 1 } }); }
+function desfazerMarca() {
+  while (pilhaMarcas.length) { const id = pilhaMarcas.pop(); const m = meta[PM + id]; if (m && !m.del) { apagarMarca(id); return; } }
+  toast("Nada para desfazer.");
+}
+
+/* ---------- fios de tricô ---------- */
+function montarFios() {
+  const ids = new Set(cordsDados.map(c => c.id));
+  for (const [id, f] of fios) if (!ids.has(id)) { f.g.remove(); fios.delete(id); }
+  for (const c of cordsDados) {
+    if (fios.has(c.id)) { fios.get(c.id).c = c; continue; }
+    const g = document.createElementNS(SVGNS, "g");
+    const mk = (cls, attrs) => { const p = document.createElementNS(SVGNS, "path"); p.setAttribute("class", cls || ""); for (const k in attrs) p.setAttribute(k, attrs[k]); g.append(p); return p; };
+    const sombra = mk("", { fill: "none", stroke: "rgba(0,0,0,.35)", "stroke-width": 4, "stroke-linecap": "round", transform: "translate(3,5)" });
+    const fio = mk("", { fill: "none", stroke: "#b3201f", "stroke-width": 3, "stroke-linecap": "round" });
+    const trama = mk("", { fill: "none", stroke: "rgba(255,170,150,.55)", "stroke-width": 1.2, "stroke-dasharray": "2 3", "stroke-linecap": "round" });
+    const hit = mk("fio-hit", {});
+    hit.addEventListener("click", () => { if (ferramenta === "ligar") cortar(c.id); });
+    svg.append(g); fios.set(c.id, { g, c, sombra, fio, trama, hit });
+  }
+}
+function atualizarFios() {
+  for (const f of fios.values()) {
+    const a = docs.get(f.c.a), b = docs.get(f.c.b); if (!a || !b) continue;
+    const ax = a.cur.x, ay = a.cur.y, bx = b.cur.x, by = b.cur.y, dist = Math.hypot(bx - ax, by - ay);
+    const cx = (ax + bx) / 2, cy = (ay + by) / 2 + Math.min(dist * 0.22 + 14, 130);
+    const dp = `M${ax.toFixed(1)} ${ay.toFixed(1)} Q${cx.toFixed(1)} ${cy.toFixed(1)} ${bx.toFixed(1)} ${by.toFixed(1)}`;
+    f.sombra.setAttribute("d", dp); f.fio.setAttribute("d", dp); f.trama.setAttribute("d", dp); f.hit.setAttribute("d", dp);
+  }
+}
+async function ligar(d) {
+  if (!selLigar) { selLigar = d; return; }
+  if (selLigar === d) { selLigar = null; return; }
+  const a = selLigar.id, b = d.id; selLigar = null;
+  if (cordsDados.some(c => (c.a === a && c.b === b) || (c.a === b && c.b === a))) { toast("Esses dois já estão ligados."); return; }
+  const { cords } = lerQuadro(meta);
+  const id = idLivre(cords);
+  await escrever({ [PC + id]: { id, a, b } });
+}
+function cortar(id) { OBR.room.setMetadata({ [PC + id]: { id, del: 1 } }).catch(() => {}); }
+
+/* ---------- lupa e leitor ---------- */
+const lente = $("#lente");
+function lente_em(clientX, clientY, u, v, wTela, hTela, imgUrl, toque) {
+  const S = 230, meio = S / 2 - 3, subir = toque ? S / 2 + 60 : 0;
+  lente.style.display = "block";
+  lente.style.left = (clientX - S / 2) + "px"; lente.style.top = (clientY - S / 2 - subir) + "px";
+  lente.style.backgroundImage = `url("${imgUrl}")`;
+  lente.style.backgroundSize = `${wTela * zoomLupa}px ${hTela * zoomLupa}px`;
+  lente.style.backgroundPosition = `${meio - u * wTela * zoomLupa}px ${meio - v * hTela * zoomLupa}px`;
+}
+document.addEventListener("pointermove", e => {
+  if (ferramenta !== "lupa" || leitorAberto()) return;
+  const alvo = document.elementFromPoint(e.clientX, e.clientY)?.closest(".doc");
+  const d = alvo && docs.get(alvo.dataset.id);
+  if (!d || !d.data.img) { lente.style.display = "none"; return; }
+  const l = paraLocal(d, paraStage(e));
+  if (l.u < 0 || l.u > 1 || l.v < 0 || l.v > 1) { lente.style.display = "none"; return; }
+  lente_em(e.clientX, e.clientY, l.u, l.v, d.data.w * esc(), altura(d) * esc(), d.data.img, e.pointerType === "touch");
+});
+function abrirLeitor(d) {
+  if (!d.data.img) return;
+  const L = $("#leitor"); L.querySelector("img").src = d.data.img; L.style.display = "flex"; lente.style.display = "none";
+}
+function fecharLeitor() { $("#leitor").style.display = "none"; lente.style.display = "none"; }
+$("#leitor .x").onclick = fecharLeitor;
+$("#leitor").addEventListener("click", e => { if (e.target.id === "leitor") fecharLeitor(); });
+$("#leitor img").addEventListener("pointermove", e => {
+  const r = e.currentTarget.getBoundingClientRect();
+  lente_em(e.clientX, e.clientY, (e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height, r.width, r.height, e.currentTarget.src, e.pointerType === "touch");
+});
+$("#leitor img").addEventListener("pointerleave", () => lente.style.display = "none");
+
+/* ---------- gravações (fitas) ---------- */
+const audios = new Map();
+let mudo = false; try { mudo = localStorage.getItem("quadro:mudo") === "1"; } catch (e) {}
+function aplicarMudo() { $("#mudobtn").textContent = mudo ? "🔇" : "🔊"; for (const o of audios.values()) o.a.volume = mudo ? 0 : 1; try { localStorage.setItem("quadro:mudo", mudo ? "1" : "0"); } catch (e) {} }
+$("#mudobtn").onclick = () => { mudo = !mudo; aplicarMudo(); };
+function marcarTocando(id, on) { const d = docs.get(id); if (d) { d.el.classList.toggle("tocando", on); if (!on && !d.el.classList.contains("tocando")) d.el.classList.toggle("temprog", (audios.get(id)?.a.currentTime || 0) > 0.5); } }
+function setProg(id, p) { const d = docs.get(id); if (d) d.el.style.setProperty("--prog", clamp(p || 0, 0, 1)); }
+function audioDe(d) {
+  let o = audios.get(d.id);
+  if (!o || o.url !== d.data.au) {
+    if (o) o.a.pause();
+    const a = new Audio(d.data.au); a.preload = "auto"; a.volume = mudo ? 0 : 1;
+    a.addEventListener("play", () => marcarTocando(d.id, true));
+    a.addEventListener("pause", () => marcarTocando(d.id, false));
+    a.addEventListener("ended", () => { a.currentTime = 0; marcarTocando(d.id, false); setProg(d.id, 0); const dd = docs.get(d.id); if (dd) dd.el.classList.remove("temprog"); });
+    a.addEventListener("timeupdate", () => setProg(d.id, a.currentTime / (a.duration || 1)));
+    a.addEventListener("error", () => toast("Não consegui tocar essa gravação."));
+    o = { a, url: d.data.au }; audios.set(d.id, o);
+  }
+  return o.a;
+}
+function pararAudio(id) { const o = audios.get(id); if (o) { o.a.pause(); audios.delete(id); } }
+function comandoFita(m) {
+  const d = docs.get(m.i); if (!d || d.data.kind !== "fita" || !d.data.au) return;
+  const a = audioDe(d);
+  if (m.a === "play") {
+    if (Math.abs(a.currentTime - (m.t || 0)) > 1.5) a.currentTime = m.t || 0;
+    a.play().catch(() => toast("Clique em qualquer lugar do quadro para liberar o som."));
+  } else if (m.a === "pause") a.pause();
+}
+function alternarFita(d) {
+  if (!d.data.au) return;
+  const a = audioDe(d);
+  const cmd = { i: d.id, a: a.paused ? "play" : "pause", t: arred(a.currentTime, 2) };
+  comandoFita(cmd);
+  OBR.broadcast.sendMessage(CH_FITA, cmd, { destination: "REMOTE" }).catch(() => {});
+}
+
+/* ---------- luz de lâmpada ---------- */
+const LUZES = {
+  branca:   { nome: "Branca",   c: "255,255,244", d: "0,0,8" },
+  amarela:  { nome: "Amarela",  c: "255,208,112", d: "16,9,0" },
+  laranja:  { nome: "Laranja",  c: "255,138,38",  d: "18,6,0" },
+  vermelha: { nome: "Vermelha", c: "255,36,36",   d: "24,0,0" },
+  roxa:     { nome: "Roxa",     c: "168,84,255",  d: "12,0,24" }
+};
+let luzCor = "amarela"; try { luzCor = localStorage.getItem("quadro:luz") || "amarela"; } catch (e) {}
+if (luzCor !== "off" && !LUZES[luzCor]) luzCor = "amarela";
+let tPisca = 0;
+const reduzido = matchMedia("(prefers-reduced-motion: reduce)").matches;
+function agendarPisca() {
+  clearTimeout(tPisca);
+  if (luzCor === "off" || reduzido) return;
+  tPisca = setTimeout(() => {
+    const seq = [.35, 1, .55, 1, .2, .9, 1]; let i = 0;
+    const passo = () => {
+      if (luzCor === "off") return;
+      $("#luz").style.setProperty("--f", seq[i++]);
+      if (i < seq.length) setTimeout(passo, 40 + Math.random() * 90); else agendarPisca();
+    };
+    passo();
+  }, 5000 + Math.random() * 11000);
+}
+function montarLuzBarra() {
+  const b = $("#luzbarra"); b.innerHTML = "";
+  for (const [k, L] of Object.entries(LUZES)) {
+    const x = document.createElement("button"); x.className = luzCor === k ? "on" : "";
+    x.innerHTML = `<i style="background:rgb(${L.c})"></i>${L.nome}`;
+    x.onclick = () => { luzCor = k; aplicarLuz(); }; b.append(x);
+  }
+  const off = document.createElement("button"); off.className = luzCor === "off" ? "on" : ""; off.textContent = "✕ Desligada";
+  off.onclick = () => { luzCor = "off"; aplicarLuz(); }; b.append(off);
+}
+function aplicarLuz() {
+  const el = $("#luz"), L = LUZES[luzCor];
+  if (!L) el.style.display = "none";
+  else { el.style.display = "block"; el.style.setProperty("--lc", L.c); el.style.setProperty("--ld", L.d); el.style.setProperty("--f", "1"); }
+  try { localStorage.setItem("quadro:luz", luzCor); } catch (e) {}
+  $("#luzbtn").classList.toggle("on", !!L);
+  agendarPisca(); montarLuzBarra();
+}
+$("#luzbtn").onclick = e => { e.stopPropagation(); const b = $("#luzbarra"); b.style.display = b.style.display === "flex" ? "none" : "flex"; };
+document.addEventListener("pointerdown", e => { if (!e.target.closest("#luzbarra,#luzbtn")) $("#luzbarra").style.display = "none"; }, true);
+
+/* ---------- laço de animação (física) ---------- */
+let ultimo = performance.now();
+function quadro(agora) {
+  const dt = Math.min(0.05, (agora - ultimo) / 1000 || 0.016); ultimo = agora;
+  for (const d of docs.values()) {
+    if (d.coast) {
+      d.tgt.x += d.coast.vx * dt; d.tgt.y += d.coast.vy * dt;
+      if (d.tgt.x < 14 || d.tgt.x > STAGE_W - 14) { d.coast.vx *= -0.35; d.tgt.x = clamp(d.tgt.x, 14, STAGE_W - 14); }
+      if (d.tgt.y < 14 || d.tgt.y > STAGE_H - 14) { d.coast.vy *= -0.35; d.tgt.y = clamp(d.tgt.y, 14, STAGE_H - 14); }
+      const atrito = Math.pow(0.04, dt); d.coast.vx *= atrito; d.coast.vy *= atrito;
+      transmitir(d);
+      if (Math.hypot(d.coast.vx, d.coast.vy) < 25) { d.coast = null; salvarDoc(d); }
+    }
+    const remoto = agora < d.remoteUntil;
+    const k = d.drag ? 0.5 : d.coast ? 0.6 : 0.28, f = 1 - Math.pow(1 - k, dt * 60);
+    const px = d.cur.x;
+    d.cur.x += (d.tgt.x - d.cur.x) * f; d.cur.y += (d.tgt.y - d.cur.y) * f; d.cur.r += (d.tgt.r - d.cur.r) * f;
+    const vxs = (d.cur.x - px) / dt;
+    const alvoSw = clamp(-vxs * 0.02, -15, 15);
+    d.swv += (-(d.sw - alvoSw) * 150 - d.swv * 9) * dt; d.sw += d.swv * dt;
+    const lev = d.drag || !!d.coast || remoto;
+    d.el.style.transform = `translate(${d.cur.x - d.data.w / 2}px, ${d.cur.y - PIN_OFF}px) rotate(${d.cur.r + d.sw}deg) scale(${lev ? 1.035 : 1})`;
+    d.pin.style.transform = `translate(${d.cur.x - 12}px, ${d.cur.y - 12}px)`;
+    if (lev !== d.wasLev) {
+      d.el.classList.toggle("lev", lev); d.pin.classList.toggle("off", lev);
+      if (!lev) { d.pin.classList.remove("pop"); void d.pin.offsetWidth; d.pin.classList.add("pop"); }
+      d.wasLev = lev;
+    }
+    d.el.classList.toggle("sel", selLigar === d);
+  }
+  atualizarFios();
+  requestAnimationFrame(quadro);
+}
+requestAnimationFrame(quadro);
+
+setFerramenta("mover"); aplicarLuz(); aplicarMudo();
+OBR.onReady(async () => {
+  OBR.broadcast.onMessage(CH_FITA, ev => ev.data && comandoFita(ev.data));
+  aplicarMeta(await OBR.room.getMetadata());
+  OBR.room.onMetadataChange(aplicarMeta);
+  OBR.broadcast.onMessage(CH_MOV, aoReceberMov);
+});
+</script>
+</body>
+</html>
